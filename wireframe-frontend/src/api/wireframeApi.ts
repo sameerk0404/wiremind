@@ -1,8 +1,45 @@
 import type { WireframeResponse } from "../types/types";
 
+interface ChatMessage {
+    role: string;
+    content: string;
+}
+
+interface ConversationRequest {
+    messages: ChatMessage[];
+    user_input: string;
+}
+
+interface ConversationResponse {
+    response: string;
+    should_generate: boolean;
+}
+
+export const handleConversation = async (messages: ChatMessage[], userInput: string): Promise<ConversationResponse> => {
+    try {
+        const response = await fetch("/api/v1/wireframe/conversation", {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({ messages, user_input: userInput }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to handle conversation", error);
+        throw error;
+    }
+};
+
+
 export const generateWireframe = async (user_query: string): Promise<WireframeResponse> => {
     try{
-        const response = await fetch("https://9288272f-a7f8-400a-bafe-0ffe568ea7d5-00-1u3ocgi6yuv29.pike.replit.dev:8000/api/v1/wireframe/generate", {
+        const response = await fetch("/api/v1/wireframe/generate", {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',

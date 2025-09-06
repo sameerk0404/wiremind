@@ -1,6 +1,6 @@
 import { Alert, Box, Button, CircularProgress, Paper, Tab, Tabs, TextField, Typography, IconButton, Avatar, Chip } from '@mui/material'
 import React, { useState, useRef, useEffect } from 'react'
-import { generateWireframe } from '../api/wireframeApi'
+import { generateWireframe, handleConversation } from '../api/wireframeApi'
 import type { WireframeResponse } from '../types/types'
 import SvgRenderer from './SvgRenderer'
 import CodeDisplay from './CodeDisplay'
@@ -61,50 +61,44 @@ const WireframeGenerator = () => {
         setInputValue('');
         setIsLoading(true);
 
-        // Decide whether to ask more questions or generate wireframe
-        if (shouldGenerateWireframe(inputValue, messages.length)) {
-            await generateWireframeFromChat();
-        } else {
-            // Ask clarifying questions
-            setTimeout(() => {
-                const aiResponse = getAIResponse(inputValue, messages, questionCount);
-                setMessages(prev => [...prev, aiResponse]);
-                setQuestionCount(prev => prev + 1);
-                setIsLoading(false);
-            }, 1000);
+        try {
+            // Convert messages to the format expected by the API
+            const apiMessages = messages.map(msg => ({
+                role: msg.role,
+                content: msg.content
+            }));
+
+            // Get intelligent AI response
+            const conversationResponse = await handleConversation(apiMessages, inputValue);
+            
+            const aiResponse: ChatMessage = {
+                role: 'assistant',
+                content: conversationResponse.response,
+                timestamp: new Date()
+            };
+
+            setMessages(prev => [...prev, aiResponse]);
+
+            // If AI thinks we should generate, do it automatically
+            if (conversationResponse.should_generate) {
+                setTimeout(() => {
+                    generateWireframeFromChat();
+                }, 1500);
+            }
+
+        } catch (error) {
+            const errorMessage: ChatMessage = {
+                role: 'assistant',
+                content: "I'm having trouble processing your request right now. Could you try rephrasing that?",
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, errorMessage]);
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const getAIResponse = (userInput: string, currentMessages: ChatMessage[], count: number): ChatMessage => {
-        const responses = [
-            "Great! Let me ask a few questions to create the perfect wireframe for you. What type of project is this - a website, mobile app, dashboard, or something else?",
-            "Perfect! Who will be using this interface? Understanding your target audience helps me design better user flows.",
-            "Excellent! What platform will this be used on primarily - desktop, mobile, tablet, or should it be responsive across all devices?",
-            "Thanks! What are the most important features or sections you need? For example: user login, product catalog, contact forms, etc.",
-            "Great context! Any style preferences? Modern/minimalist, corporate, creative, or should I decide based on the project type?",
-            "Perfect! I have enough information now. Let me create your wireframe! 🎨"
-        ];
 
-        const isQuestion = count < responses.length - 1;
-        
-        return {
-            role: 'assistant',
-            content: responses[Math.min(count, responses.length - 1)],
-            timestamp: new Date(),
-            isQuestion
-        };
-    };
-
-    const shouldGenerateWireframe = (userInput: string, messageCount: number): boolean => {
-        return (
-            userInput.toLowerCase().includes('generate') ||
-            userInput.toLowerCase().includes('create') ||
-            userInput.toLowerCase().includes('build') ||
-            userInput.toLowerCase().includes('skip') ||
-            questionCount >= 4 ||
-            messageCount >= 10
-        );
-    };
 
     const generateWireframeFromChat = async () => {
         // Combine all conversation context

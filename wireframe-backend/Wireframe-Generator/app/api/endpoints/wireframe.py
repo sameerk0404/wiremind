@@ -2,14 +2,111 @@ from http.client import HTTPException
 from app.api.dependencies import get_cache
 from app.models.wireframe import WireframeRequest, WireframeResponse
 from app.services.wireframe.graph import generate_wireframe
+from app.config import settings
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langsmith import traceable
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 import time
 from typing import List, Dict, Any, Optional
 
 
 
 router = APIRouter()
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ConversationRequest(BaseModel):
+    messages: List[ChatMessage]
+    user_input: str
+
+class ConversationResponse(BaseModel):
+    response: str
+    should_generate: bool = False
+
+
+def get_conversation_llm():
+    """Get LLM for conversation handling"""
+    return ChatGoogleGenerativeAI(
+        model=settings.DEFAULT_MODEL,
+        api_key=settings.GOOGLE_API_KEY,
+        temperature=0.7,
+        max_tokens=None,
+        timeout=None,
+        max_retries=3,
+    )
+
+@router.post("/conversation", response_model=ConversationResponse)
+@traceable
+async def handle_conversation(request: ConversationRequest):
+    """
+    Handle intelligent conversation for wireframe requirements gathering.
+    
+    Args:
+        request: ConversationRequest containing message history and new user input
+        
+    Returns:
+        ConversationResponse with AI-generated response and generation flag
+    """
+    
+    try:
+        # Get conversation history
+        conversation_history = "\n".join([f"{msg.role}: {msg.content}" for msg in request.messages])
+        
+        # Create prompt for intelligent conversation
+        prompt = f"""You are an expert UX/UI consultant helping users create wireframes. Your job is to ask intelligent, context-specific questions to gather enough information to create the perfect wireframe.
+
+Conversation so far:
+{conversation_history}
+
+User's latest input: {request.user_input}
+
+INSTRUCTIONS:
+1. Analyze what the user has told you so far about their wireframe needs
+2. Identify what critical information is still missing
+3. Ask ONE specific, intelligent question that will help you understand their requirements better
+4. If you have enough information to create a good wireframe, respond with "I have enough information to create your wireframe! Let me get started." and I'll set should_generate=true
+
+QUESTION CATEGORIES (ask based on what's missing):
+- Project type and purpose (if unclear)
+- Target audience and their goals  
+- Platform preferences (desktop, mobile, responsive)
+- Key functionality and features needed
+- Content structure and priorities
+- Style and design preferences
+- Business goals and success metrics
+
+RULES:
+- Ask only ONE question at a time
+- Make questions specific to their project (not generic)
+- Use what they've already told you to show you're listening
+- Be conversational and helpful, not robotic
+- If they seem ready to generate or have given detailed info, offer to start creating
+
+Your response should be a natural, helpful question or statement (not JSON, just plain text):"""
+
+        model = get_conversation_llm()
+        response = model.invoke(prompt)
+        
+        # Check if AI thinks we should generate the wireframe
+        should_generate = (
+            "enough information" in response.content.lower() or
+            "get started" in response.content.lower() or
+            "create your wireframe" in response.content.lower()
+        )
+        
+        return ConversationResponse(
+            response=response.content,
+            should_generate=should_generate
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Conversation error: {str(e)}")
+
 
 @router.post("/generate", response_model=WireframeResponse)
 async def create_wireframe(
