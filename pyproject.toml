@@ -1,0 +1,23 @@
+[project]
+name = "repl-nix-workspace"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.115.12",
+    "httpx==0.28.1",
+    "langchain-anthropic==0.3.13",
+    "langchain==0.3.25",
+    "langsmith==0.3.42",
+    "python-dotenv==1.1.0",
+    "python-multipart==0.0.20",
+    "tenacity==9.1.2",
+    "langchain-core>=0.3.63",
+    "langchain-google-genai==2.1.4",
+    "langchain-openai==0.3.17",
+    "langgraph==0.4.5",
+    "uvicorn==0.34.2",
+    "pydantic==2.11.4",
+    "redis==6.1.0",
+    "pydantic-settings==2.9.1",
+]
