@@ -20,15 +20,15 @@ AI-powered fullstack web application that generates wireframes from natural lang
 
 ## Recent Changes
 - Configured Vite to bind to 0.0.0.0:5000 for Replit proxy compatibility
-- Added Replit domain to allowedHosts in Vite config to fix "Blocked request" errors
-- Updated frontend API endpoint to use Replit domain for backend communication
+- Updated Vite config to use `allowedHosts: true` for universal proxy support
+- Updated frontend API endpoint to use current Replit domain for backend communication
+- Installed all Python backend dependencies via pip
+- Installed all Node.js frontend dependencies via npm
+- Created optimized startup script that runs both frontend and backend services
 - Set up deployment configuration for autoscale deployment
-- Created startup script to run both frontend and backend services
 - Successfully imported and configured GitHub project for Replit environment
-- **UI/UX Overhaul**: Completely redesigned frontend with modern, attractive hero section
-- **Split-Screen Layout**: Implemented dynamic layout - input sidebar on left, wireframe display on right
-- **AI Model Update**: Changed from gemini-2.5-flash-preview to gemini-1.5-flash for better reliability
-- **Backend Workflow**: Set up proper backend workflow running on port 8000
+- Verified both frontend (port 5000) and backend (port 8000) are running properly
+- Google API key configured and available for Gemini AI model
 
 ## Deployment
 - Target: Autoscale (stateless)

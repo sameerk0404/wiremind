@@ -2,7 +2,7 @@ import type { WireframeResponse } from "../types/types";
 
 export const generateWireframe = async (user_query: string): Promise<WireframeResponse> => {
     try{
-        const response = await fetch("https://39f3ae5d-d91b-4c54-9ea4-5c395bb8c2f2-00-37md1qc6p8i2a.sisko.replit.dev:8000/api/v1/wireframe/generate", {
+        const response = await fetch("https://9288272f-a7f8-400a-bafe-0ffe568ea7d5-00-1u3ocgi6yuv29.pike.replit.dev:8000/api/v1/wireframe/generate", {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
