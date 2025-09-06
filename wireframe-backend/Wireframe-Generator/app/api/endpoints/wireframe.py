@@ -57,44 +57,58 @@ async def handle_conversation(request: ConversationRequest):
         # Get conversation history
         conversation_history = "\n".join([f"{msg.role}: {msg.content}" for msg in request.messages])
         
-        # Count previous assistant messages to limit questions
+        # Analyze if we can generate immediately based on knowledge
+        user_input_lower = request.user_input.lower()
+        
+        # Knowledge-based immediate generation for common patterns
+        common_patterns = [
+            'website', 'homepage', 'landing page', 'site',
+            'dashboard', 'admin panel', 'control panel',
+            'e-commerce', 'shop', 'store', 'marketplace',
+            'app', 'mobile app', 'application',
+            'blog', 'news', 'article', 'content',
+            'portfolio', 'profile', 'resume',
+            'login', 'signup', 'authentication',
+            'contact', 'about', 'services',
+            'restaurant', 'cafe', 'food', 'menu',
+            'booking', 'reservation', 'appointment',
+            'fitness', 'gym', 'health', 'workout',
+            'social', 'chat', 'messaging', 'forum',
+            'education', 'learning', 'course', 'school',
+            'finance', 'banking', 'payment', 'wallet'
+        ]
+        
+        # Check if user described something we have knowledge about
+        has_clear_pattern = any(pattern in user_input_lower for pattern in common_patterns)
+        
+        # Also check conversation history for patterns
+        conversation_text = conversation_history.lower()
+        has_pattern_in_history = any(pattern in conversation_text for pattern in common_patterns)
+        
+        # Count assistant messages
         assistant_messages = [msg for msg in request.messages if msg.role == 'assistant']
         question_count = len(assistant_messages)
         
-        # Be much more restrictive - generate wireframes quickly
-        if question_count >= 2:  # Force generation after just 2 questions
+        # Generate immediately if we recognize the pattern OR after 1 question
+        if has_clear_pattern or has_pattern_in_history or question_count >= 1:
             return ConversationResponse(
-                response="Perfect! I have enough information to create your wireframe. Let me get started!",
+                response="Perfect! I understand what you need. Let me create your wireframe using my knowledge of proven UI patterns and best practices.",
                 should_generate=True
             )
         
-        # Create prompt for very restrictive conversation
-        prompt = f"""You are an expert UX/UI consultant. You create wireframes based on user descriptions using your extensive knowledge of common UI patterns and best practices.
+        # Only ask ONE clarifying question if we truly don't understand
+        prompt = f"""You are an expert UX/UI consultant with extensive knowledge of common interface patterns. 
 
-Conversation so far:
-{conversation_history}
+User's input: {request.user_input}
+Conversation: {conversation_history}
 
-User's latest input: {request.user_input}
+The user's request is unclear. Ask ONE simple question to understand what type of interface they want to create. 
 
-CRITICAL RULES:
-- You have asked {question_count} questions. You can ask MAXIMUM 1-2 questions total.
-- If the user has given you a clear project description (like "e-commerce site", "dashboard", "landing page", "mobile app"), you should generate immediately.
-- Only ask 1 question if you need to know: mobile vs desktop OR the single most critical missing feature
-- Use your knowledge of common UI patterns - don't ask about obvious things
+Examples of good single questions:
+- "What type of application are you looking to create - a website, mobile app, or dashboard?"
+- "Is this for a business website, personal portfolio, or something else?"
 
-DECISION LOGIC:
-1. If user described a clear project type (website, app, dashboard, etc.) → respond with "Perfect! I'll create your wireframe now." and I'll set should_generate=true
-2. If unclear whether mobile or desktop and it matters → ask ONLY that
-3. If completely unclear what they want → ask ONLY for project type
-4. NEVER ask about colors, styling, branding, or minor details
-
-Examples of when to generate immediately:
-- "e-commerce website" → Generate (you know common e-commerce patterns)
-- "project management dashboard" → Generate (you know dashboard patterns)  
-- "restaurant website" → Generate (you know restaurant site patterns)
-- "mobile fitness app" → Generate (you know fitness app patterns)
-
-Your response should be a natural, helpful question or statement (not JSON, just plain text):"""
+Be brief and helpful. Ask only ONE question to clarify the project type:"""
 
         model = get_conversation_llm()
         response = model.invoke(prompt)
