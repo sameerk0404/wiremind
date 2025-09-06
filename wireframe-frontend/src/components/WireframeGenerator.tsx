@@ -19,7 +19,12 @@ interface ChatMessage {
     isQuestion?: boolean;
 }
 
-const WireframeGenerator = () => {
+interface WireframeGeneratorProps {
+    initialDescription?: string;
+    onBackToLanding?: () => void;
+}
+
+const WireframeGenerator: React.FC<WireframeGeneratorProps> = ({ initialDescription = '', onBackToLanding }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([
         {
             role: 'assistant',
@@ -33,8 +38,23 @@ const WireframeGenerator = () => {
     const [wireframeResponse, setWireframeResponse] = useState<WireframeResponse | null>(null);
     const [tabValue, setTabValue] = useState(0);
     const [questionCount, setQuestionCount] = useState(0);
+    const [hasStarted, setHasStarted] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // Handle initial description from landing page
+    useEffect(() => {
+        if (initialDescription && !hasStarted) {
+            setHasStarted(true);
+            const initialMessage: ChatMessage = {
+                role: 'user',
+                content: initialDescription,
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, initialMessage]);
+            handleSendMessage(initialDescription);
+        }
+    }, [initialDescription, hasStarted]);
 
     useEffect(() => {
         scrollToBottom();
@@ -48,17 +68,18 @@ const WireframeGenerator = () => {
         setInputValue(e.target.value);
     };
 
-    const handleSendMessage = async () => {
-        if (!inputValue.trim() || isLoading) return;
+    const handleSendMessage = async (customInput?: string) => {
+        const messageText = customInput || inputValue;
+        if (!messageText.trim() || isLoading) return;
 
         const userMessage: ChatMessage = {
             role: 'user',
-            content: inputValue,
+            content: messageText,
             timestamp: new Date()
         };
 
         setMessages(prev => [...prev, userMessage]);
-        setInputValue('');
+        if (!customInput) setInputValue(''); // Only clear input if not using custom input
         setIsLoading(true);
 
         try {
@@ -69,7 +90,7 @@ const WireframeGenerator = () => {
             }));
 
             // Get intelligent AI response
-            const conversationResponse = await handleConversation(apiMessages, inputValue);
+            const conversationResponse = await handleConversation(apiMessages, messageText);
             
             const aiResponse: ChatMessage = {
                 role: 'assistant',

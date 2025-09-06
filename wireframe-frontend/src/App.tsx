@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
-import { Typography } from '@mui/material'
 import WireframeGenerator from './components/WireframeGenerator'
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import LandingPage from './components/LandingPage'
+import { ThemeProvider, createTheme, CssBaseline, Fade } from '@mui/material';
 
 const theme = createTheme({
   palette: {
@@ -64,11 +62,35 @@ const theme = createTheme({
   },
 });
 function App() {
+  const [currentView, setCurrentView] = useState<'landing' | 'generator'>('landing');
+  const [initialDescription, setInitialDescription] = useState<string>('');
+
+  const handleGenerateWireframe = (description: string) => {
+    setInitialDescription(description);
+    setCurrentView('generator');
+  };
+
+  const handleBackToLanding = () => {
+    setCurrentView('landing');
+    setInitialDescription('');
+  };
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <WireframeGenerator />
+      <Fade in={currentView === 'landing'} timeout={600} unmountOnExit>
+        <div style={{ position: currentView === 'landing' ? 'relative' : 'absolute', width: '100%', zIndex: currentView === 'landing' ? 1 : 0 }}>
+          <LandingPage onGenerateWireframe={handleGenerateWireframe} />
+        </div>
+      </Fade>
+      <Fade in={currentView === 'generator'} timeout={600} unmountOnExit>
+        <div style={{ position: currentView === 'generator' ? 'relative' : 'absolute', width: '100%', zIndex: currentView === 'generator' ? 1 : 0 }}>
+          <WireframeGenerator 
+            initialDescription={initialDescription}
+            onBackToLanding={handleBackToLanding}
+          />
+        </div>
+      </Fade>
     </ThemeProvider>
   );
 }
