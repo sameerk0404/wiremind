@@ -57,7 +57,11 @@ async def handle_conversation(request: ConversationRequest):
         # Get conversation history
         conversation_history = "\n".join([f"{msg.role}: {msg.content}" for msg in request.messages])
         
-        # Create prompt for intelligent conversation
+        # Count previous assistant messages to limit questions
+        assistant_messages = [msg for msg in request.messages if msg.role == 'assistant']
+        question_count = len(assistant_messages)
+        
+        # Create prompt for intelligent conversation with question limit
         prompt = f"""You are an expert UX/UI consultant helping users create wireframes. Your job is to ask intelligent, context-specific questions to gather enough information to create the perfect wireframe.
 
 Conversation so far:
@@ -65,27 +69,25 @@ Conversation so far:
 
 User's latest input: {request.user_input}
 
+CRITICAL CONSTRAINT: You have asked {question_count} questions already. You MUST generate the wireframe after asking a MAXIMUM of 3-4 questions total.
+
 INSTRUCTIONS:
 1. Analyze what the user has told you so far about their wireframe needs
-2. Identify what critical information is still missing
-3. Ask ONE specific, intelligent question that will help you understand their requirements better
-4. If you have enough information to create a good wireframe, respond with "I have enough information to create your wireframe! Let me get started." and I'll set should_generate=true
+2. If you have asked 3+ questions OR have enough basic information, respond with "Perfect! I have enough information to create your wireframe. Let me get started!" and I'll set should_generate=true
+3. If you have asked fewer than 3 questions and need ONE more critical piece of info, ask it
+4. NEVER ask more than 4 questions total - users want quick results
 
-QUESTION CATEGORIES (ask based on what's missing):
-- Project type and purpose (if unclear)
-- Target audience and their goals  
-- Platform preferences (desktop, mobile, responsive)
-- Key functionality and features needed
-- Content structure and priorities
-- Style and design preferences
-- Business goals and success metrics
+ESSENTIAL INFO TO GATHER (pick the most important missing piece):
+1. Project type/purpose (website, app, dashboard, etc.)
+2. Key features/functionality needed
+3. Platform (desktop/mobile/responsive)
 
 RULES:
 - Ask only ONE question at a time
-- Make questions specific to their project (not generic)
-- Use what they've already told you to show you're listening
-- Be conversational and helpful, not robotic
-- If they seem ready to generate or have given detailed info, offer to start creating
+- After 3-4 questions, ALWAYS offer to generate
+- Be conversational and helpful
+- Don't ask about minor details like colors or exact styling
+- Focus on functional requirements only
 
 Your response should be a natural, helpful question or statement (not JSON, just plain text):"""
 
