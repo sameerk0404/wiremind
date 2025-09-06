@@ -52,9 +52,12 @@ const WireframeGenerator: React.FC<WireframeGeneratorProps> = ({ initialDescript
                 timestamp: new Date()
             };
             setMessages(prev => [...prev, initialMessage]);
-            handleSendMessage(initialDescription);
+            // Use setTimeout to avoid race conditions and prevent multiple sends
+            setTimeout(() => {
+                handleSendMessage(initialDescription);
+            }, 100);
         }
-    }, [initialDescription, hasStarted]);
+    }, [initialDescription]); // Remove hasStarted from dependencies to prevent re-runs
 
     useEffect(() => {
         scrollToBottom();

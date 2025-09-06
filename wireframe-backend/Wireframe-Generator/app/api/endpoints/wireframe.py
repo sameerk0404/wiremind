@@ -61,33 +61,38 @@ async def handle_conversation(request: ConversationRequest):
         assistant_messages = [msg for msg in request.messages if msg.role == 'assistant']
         question_count = len(assistant_messages)
         
-        # Create prompt for intelligent conversation with question limit
-        prompt = f"""You are an expert UX/UI consultant helping users create wireframes. Your job is to ask intelligent, context-specific questions to gather enough information to create the perfect wireframe.
+        # Be much more restrictive - generate wireframes quickly
+        if question_count >= 2:  # Force generation after just 2 questions
+            return ConversationResponse(
+                response="Perfect! I have enough information to create your wireframe. Let me get started!",
+                should_generate=True
+            )
+        
+        # Create prompt for very restrictive conversation
+        prompt = f"""You are an expert UX/UI consultant. You create wireframes based on user descriptions using your extensive knowledge of common UI patterns and best practices.
 
 Conversation so far:
 {conversation_history}
 
 User's latest input: {request.user_input}
 
-CRITICAL CONSTRAINT: You have asked {question_count} questions already. You MUST generate the wireframe after asking a MAXIMUM of 3-4 questions total.
+CRITICAL RULES:
+- You have asked {question_count} questions. You can ask MAXIMUM 1-2 questions total.
+- If the user has given you a clear project description (like "e-commerce site", "dashboard", "landing page", "mobile app"), you should generate immediately.
+- Only ask 1 question if you need to know: mobile vs desktop OR the single most critical missing feature
+- Use your knowledge of common UI patterns - don't ask about obvious things
 
-INSTRUCTIONS:
-1. Analyze what the user has told you so far about their wireframe needs
-2. If you have asked 3+ questions OR have enough basic information, respond with "Perfect! I have enough information to create your wireframe. Let me get started!" and I'll set should_generate=true
-3. If you have asked fewer than 3 questions and need ONE more critical piece of info, ask it
-4. NEVER ask more than 4 questions total - users want quick results
+DECISION LOGIC:
+1. If user described a clear project type (website, app, dashboard, etc.) → respond with "Perfect! I'll create your wireframe now." and I'll set should_generate=true
+2. If unclear whether mobile or desktop and it matters → ask ONLY that
+3. If completely unclear what they want → ask ONLY for project type
+4. NEVER ask about colors, styling, branding, or minor details
 
-ESSENTIAL INFO TO GATHER (pick the most important missing piece):
-1. Project type/purpose (website, app, dashboard, etc.)
-2. Key features/functionality needed
-3. Platform (desktop/mobile/responsive)
-
-RULES:
-- Ask only ONE question at a time
-- After 3-4 questions, ALWAYS offer to generate
-- Be conversational and helpful
-- Don't ask about minor details like colors or exact styling
-- Focus on functional requirements only
+Examples of when to generate immediately:
+- "e-commerce website" → Generate (you know common e-commerce patterns)
+- "project management dashboard" → Generate (you know dashboard patterns)  
+- "restaurant website" → Generate (you know restaurant site patterns)
+- "mobile fitness app" → Generate (you know fitness app patterns)
 
 Your response should be a natural, helpful question or statement (not JSON, just plain text):"""
 
