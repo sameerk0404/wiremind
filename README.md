@@ -118,13 +118,6 @@ Visit http://localhost:3000
 ```
 
 
-### 🐳 Docker Option
-From the backend root (Wireframe-Generator):
-
-``` bash
-docker-compose up --build
-```
-
 ### 🎨 Frontend Preview
 1. Enter a query like:
 "Design a responsive checkout page for a fashion e-commerce app"
