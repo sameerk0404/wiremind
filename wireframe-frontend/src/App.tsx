@@ -66,6 +66,9 @@ function App() {
   const [initialDescription, setInitialDescription] = useState<string>('');
 
   const handleGenerateWireframe = (description: string) => {
+    // Only proceed if we have a description and aren't already showing the generator
+    if (!description.trim() || currentView === 'generator') return;
+    
     setInitialDescription(description);
     setCurrentView('generator');
   };

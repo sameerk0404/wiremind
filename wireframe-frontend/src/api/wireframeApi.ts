@@ -15,56 +15,68 @@ interface ConversationResponse {
     should_generate: boolean;
 }
 
-export const handleConversation = async (messages: ChatMessage[], userInput: string): Promise<ConversationResponse> => {
-    try {
-        const response = await fetch("/api/v1/wireframe/conversation", {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-            },
-            body: JSON.stringify({ messages, user_input: userInput }),
-        });
+import axios from 'axios';
+const axiosInstance = axios.create({
+    baseURL: '/api/v1',
+    headers: {
+        'Content-Type': 'application/json',
+    }
+});
 
-        if (!response.ok) {
-            throw new Error(`Error: ${response.status}`);
+export const handleConversation = async (messages: ChatMessage[], user_input: string): Promise<ConversationResponse> => {
+    try {
+        console.log('Sending request with:', { messages, user_input });  // Debug log
+        const response = await axiosInstance.post('/wireframe/conversation', { 
+            messages: messages.map(m => ({
+                role: m.role,
+                content: m.content
+            })),
+            user_input: user_input
+        });
+        console.log('Received response:', response.data);  // Debug log
+        return response.data as ConversationResponse;
+    } catch (error: any) {
+        console.error('Error in handleConversation:', error);
+        // Log more details about the error
+        if (error.response) {
+            console.error('Error response:', error.response.data);
         }
-        
-        return await response.json();
-    } catch (error) {
-        console.error("Failed to handle conversation", error);
-        throw error;
+        if (error.response?.status === 500) {
+            return {
+                response: "I'm having trouble connecting to my AI service. Please try again in a moment.",
+                should_generate: false
+            };
+        }
+        return {
+            response: "I'm having trouble processing your request. Please try again.",
+            should_generate: false
+        };
     }
 };
 
 
 export const generateWireframe = async (user_query: string): Promise<WireframeResponse> => {
-    try{
-        const response = await fetch("/api/v1/wireframe/generate", {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-            },
-            body: JSON.stringify({user_query}),
-        })
-
-        if (!response.ok){
-            throw new Error(`Error: ${response.status}`);
-        }
-        
-        if (response.status === 200){
-            return await response.json();
-        }
-
+    try {
+        const response = await axiosInstance.post<Omit<WireframeResponse, 'status'>>('/wireframe/generate', { user_query });
         return {
-            svg_code: "",
-            errors: ["Failed to generate a wireframe"],
+            ...response.data,
+            status: response.status
         };
-
-    } catch (error) {
-        console.error("'Failed to generate a wireframe", error)
+    } catch (error: any) {
+        console.error("Failed to generate wireframe", error);
+        if (error.response?.data?.detail) {
+            return {
+                svg_code: "",
+                detailed_requirements: error.response.data.detail.detailed_requirements,
+                wireframe_plan: error.response.data.detail.wireframe_plan,
+                errors: error.response.data.detail.errors || [error.response.data.detail.message],
+                status: error.response.status
+            };
+        }
         return {
             svg_code: "",
-            errors: [(error as Error).message],
-        }
+            errors: [error.response?.data?.message || "There was a problem generating your wireframe. Please try again."],
+            status: error.response?.status || 500
+        };
     }
 }
