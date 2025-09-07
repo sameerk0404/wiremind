@@ -18,7 +18,7 @@ This tool allows users to describe what kind of UI they want (e.g., “Build a c
 ### 🔗 Backend
 - **FastAPI** (Python)
 - **LangGraph** for multi-agent orchestration
-- **LLM**: Google’s `gemini-2.5-flash-preview-04-17`
+- **LLM**: Google’s `gemini-2.5-flash`
 - **Docker** for containerization
 
 ### 🎨 Frontend

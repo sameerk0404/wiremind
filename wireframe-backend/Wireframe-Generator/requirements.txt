@@ -19,3 +19,9 @@ langsmith==0.3.42
 redis==6.1.0
 httpx==0.28.1
 tenacity==9.1.2
+
+# Image Processing
+Pillow==10.2.0
+opencv-python==4.9.0.80
+numpy==1.26.4
+svgwrite==1.4.3

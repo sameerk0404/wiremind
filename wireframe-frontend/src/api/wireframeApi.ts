@@ -1,4 +1,5 @@
 import type { WireframeResponse } from "../types/types";
+import axios from 'axios';
 
 interface ChatMessage {
     role: string;
@@ -15,7 +16,6 @@ interface ConversationResponse {
     should_generate: boolean;
 }
 
-import axios from 'axios';
 const axiosInstance = axios.create({
     baseURL: '/api/v1',
     headers: {
@@ -25,7 +25,6 @@ const axiosInstance = axios.create({
 
 export const handleConversation = async (messages: ChatMessage[], user_input: string): Promise<ConversationResponse> => {
     try {
-        console.log('Sending request with:', { messages, user_input });  // Debug log
         const response = await axiosInstance.post('/wireframe/conversation', { 
             messages: messages.map(m => ({
                 role: m.role,
@@ -33,14 +32,9 @@ export const handleConversation = async (messages: ChatMessage[], user_input: st
             })),
             user_input: user_input
         });
-        console.log('Received response:', response.data);  // Debug log
         return response.data as ConversationResponse;
     } catch (error: any) {
         console.error('Error in handleConversation:', error);
-        // Log more details about the error
-        if (error.response) {
-            console.error('Error response:', error.response.data);
-        }
         if (error.response?.status === 500) {
             return {
                 response: "I'm having trouble connecting to my AI service. Please try again in a moment.",
@@ -53,7 +47,6 @@ export const handleConversation = async (messages: ChatMessage[], user_input: st
         };
     }
 };
-
 
 export const generateWireframe = async (user_query: string): Promise<WireframeResponse> => {
     try {
@@ -79,4 +72,35 @@ export const generateWireframe = async (user_query: string): Promise<WireframeRe
             status: error.response?.status || 500
         };
     }
-}
+};
+
+export const convertImageToWireframe = async (file: File): Promise<WireframeResponse> => {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await axiosInstance.post<Omit<WireframeResponse, 'status'>>('/wireframe/image-to-wireframe', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return {
+            ...response.data,
+            status: response.status
+        };
+    } catch (error: any) {
+        console.error("Failed to convert image", error);
+        if (error.response?.data?.detail) {
+            return {
+                svg_code: "",
+                errors: [error.response?.data?.detail || "Failed to convert image to wireframe"],
+                status: error.response?.status || 500
+            };
+        }
+        return {
+            svg_code: "",
+            errors: ["Failed to convert image to wireframe"],
+            status: 500
+        };
+    }
+};

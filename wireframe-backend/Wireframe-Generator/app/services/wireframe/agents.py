@@ -4,6 +4,7 @@ from app.config import Settings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langsmith import traceable
 import json
+import re
 
 from app.models.wireframe import WireframeState
 
@@ -1306,14 +1307,36 @@ Add these CSS rules to the style section of your SVG:
     response = model.invoke(prompt)
 
     try:
+        # Validate state
+        if not state.get("detailed_requirements"):
+            raise ValueError("Missing detailed requirements in state")
+        if not state.get("wireframe_plan"):
+            raise ValueError("Missing wireframe plan in state")
+
         # Extract SVG code from the response
         unstructured_svg_code = extract_svg_from_text(response.content)
-        svg_code = clean_svg(unstructured_svg_code)
+        if not unstructured_svg_code:
+            raise ValueError("Failed to extract SVG code from the model response")
 
-         # Simple validation
+        # Clean and validate SVG code
+        svg_code = clean_svg(unstructured_svg_code)
         if not svg_code or ("<svg" not in svg_code and "<!DOCTYPE" not in svg_code):
-            raise ValueError("Failed to extract valid SVG code from the model response")
-        
+            raise ValueError("Invalid SVG code structure")
+
+        # Validate basic SVG structure
+        if not re.search(r'<svg[^>]*>', svg_code):
+            raise ValueError("Missing SVG root element")
+        if not svg_code.strip().endswith('</svg>'):
+            raise ValueError("Missing SVG closing tag")
+
+        # Ensure required SVG attributes
+        if 'viewBox' not in svg_code:
+            # Add default viewBox if missing
+            svg_code = svg_code.replace('<svg', '<svg viewBox="0 0 1200 800"')
+
+        if 'xmlns' not in svg_code:
+            # Add SVG namespace if missing
+            svg_code = svg_code.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
 
         return {
             **state,

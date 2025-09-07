@@ -237,14 +237,53 @@ def parse_json_safely(json_str: str) -> dict:
     except json.JSONDecodeError as e:
         # Try to clean the string first
         cleaned_str = json_str.strip()
+        
         # Remove any trailing commas before closing brackets
-        cleaned_str = re.sub(r',\s*}', '}', cleaned_str)
-        cleaned_str = re.sub(r',\s*]', ']', cleaned_str)
+        cleaned_str = re.sub(r',(\s*[}\]])', r'\1', cleaned_str)
+        
+        # Fix unescaped quotes in strings
+        cleaned_str = re.sub(r'(?<!\\)"(?![,}\]\s])', r'\"', cleaned_str)
+        
+        # Fix malformed escape sequences
+        cleaned_str = re.sub(r'\\([^"\\/bfnrtu])', r'\1', cleaned_str)
+        
+        # Attempt to balance brackets and braces
+        bracket_stack = []
+        brace_stack = []
+        fixed_str = ""
+        
+        for char in cleaned_str:
+            if char == '{':
+                brace_stack.append(char)
+            elif char == '[':
+                bracket_stack.append(char)
+            elif char == '}' and brace_stack:
+                brace_stack.pop()
+            elif char == ']' and bracket_stack:
+                bracket_stack.pop()
+            fixed_str += char
+        
+        # Close any remaining open brackets/braces
+        fixed_str += '}' * len(brace_stack)
+        fixed_str += ']' * len(bracket_stack)
         
         try:
-            return json.loads(cleaned_str)
+            return json.loads(fixed_str)
         except json.JSONDecodeError:
-            raise ValueError(f"Failed to parse JSON: {str(e)}")
+            try:
+                # As a last resort, try to repair common formatting issues
+                lines = fixed_str.split('\n')
+                repaired_lines = []
+                for line in lines:
+                    # Remove trailing commas
+                    line = re.sub(r',\s*$', '', line)
+                    # Ensure property names are quoted
+                    line = re.sub(r'(\s*)(\w+)(:)', r'\1"\2"\3', line)
+                    repaired_lines.append(line)
+                final_str = '\n'.join(repaired_lines)
+                return json.loads(final_str)
+            except json.JSONDecodeError:
+                raise ValueError(f"Failed to parse JSON: {str(e)}")
 
 
 

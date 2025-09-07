@@ -30,8 +30,8 @@ class Settings(BaseSettings):
 
 
     # Model settings
-    DEFAULT_MODEL: str = "gemini-2.0-flash-exp"
-    MODEL_TEMPERATURE: float = 0.3
+    DEFAULT_MODEL: str = "gemini-2.5-flash"
+    MODEL_TEMPERATURE: float = 0.7
 
     # Cache settings
     CACHE_ENABLED: bool = os.getenv("CACHE_ENABLED", "true").lower() == "true"

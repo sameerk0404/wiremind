@@ -3,16 +3,13 @@ from app.api.dependencies import get_cache
 from app.models.wireframe import WireframeRequest, WireframeResponse
 from app.services.wireframe.graph import generate_wireframe
 from app.config import settings
-from app.utils.image_processor import image_to_svg
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langsmith import traceable
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import time
 from typing import List, Dict, Any, Optional
-import tempfile
-import os
 
 
 
@@ -92,16 +89,15 @@ async def handle_conversation(request: ConversationRequest):
         assistant_messages = [msg for msg in request.messages if msg.role == 'assistant']
         question_count = len(assistant_messages)
         
-        # Force generation after 3-4 questions to prevent endless questioning
-        # Force generation after 3-4 questions or if we have detailed info
-        if (question_count >= 3 or (has_clear_pattern and question_count >= 2)) and not any(msg.content.lower().startswith("perfect! i've created your wireframe") for msg in request.messages):
+        # Generate immediately if we recognize the pattern OR after 1 question
+        if has_clear_pattern or has_pattern_in_history or question_count >= 1:
             return ConversationResponse(
                 response="Perfect! I understand what you need. Let me create your wireframe using my knowledge of proven UI patterns and best practices.",
                 should_generate=True
             )
         
         # Only ask ONE clarifying question if we truly don't understand
-        prompt = f"""You are an expert UX/UI consultant. Analyze the user request and ask ONE intelligent follow-up question. 
+        prompt = f"""You are an expert UX/UI consultant with extensive knowledge of common interface patterns. 
 
 User's input: {request.user_input}
 Conversation: {conversation_history}
@@ -112,7 +108,7 @@ Examples of good single questions:
 - "What type of application are you looking to create - a website, mobile app, or dashboard?"
 - "Is this for a business website, personal portfolio, or something else?"
 
-Be brief and helpful. Ask only ONE question that is directly relevant to their request:"""
+Be brief and helpful. Ask only ONE question to clarify the project type:"""
 
         model = get_conversation_llm()
         response = model.invoke(prompt)
@@ -193,57 +189,6 @@ async def create_wireframe(
             detail={
                 "message": f"Error generating wireframe: {str(e)}"
             }
-        )
-
-@router.post("/image-to-wireframe", response_model=WireframeResponse)
-async def convert_image_to_wireframe(
-    file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = None,
-    cache = Depends(get_cache)
-    ):
-    """
-    Convert an uploaded image to a wireframe SVG.
-    """
-    try:
-        # Check if file is an image
-        if not file.content_type.startswith('image/'):
-            raise HTTPException(
-                status_code=400,
-                detail="File must be an image"
-            )
-            
-        # Create a temporary file to store the uploaded image
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-            temp_file.write(await file.read())
-            temp_file_path = temp_file.name
-            
-        try:
-            # Convert image to SVG wireframe
-            svg_code = await image_to_svg(temp_file_path)
-            
-            response = WireframeResponse(
-                svg_code=svg_code,
-                detailed_requirements={"source": "image-to-wireframe", "filename": file.filename},
-                wireframe_plan={"type": "image-conversion"},
-                errors=None,
-                status=200
-            )
-            
-            # Store in cache if enabled
-            if cache:
-                cache_key = f"image-{file.filename}"
-                background_tasks.add_task(cache.set, cache_key, response)
-                
-            return response
-            
-        finally:
-            # Clean up the temporary file
-            os.unlink(temp_file_path)
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error converting image to wireframe: {str(e)}"
         )
     
 

@@ -1,4 +1,4 @@
-import { Box, CircularProgress, Tab, Tabs, TextField, Typography, IconButton, Avatar, Chip } from '@mui/material'
+import { Alert, Box, Button, CircularProgress, Paper, Tab, Tabs, TextField, Typography, IconButton, Avatar, Chip } from '@mui/material'
 import React, { useState, useRef, useEffect } from 'react'
 import { generateWireframe, handleConversation } from '../api/wireframeApi'
 import type { WireframeResponse } from '../types/types'
@@ -6,7 +6,6 @@ import SvgRenderer from './SvgRenderer'
 import CodeDisplay from './CodeDisplay'
 import PreviewIcon from '@mui/icons-material/Preview';
 import CodeIcon from '@mui/icons-material/Code';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import SendIcon from '@mui/icons-material/Send';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
@@ -26,14 +25,19 @@ interface WireframeGeneratorProps {
 }
 
 const WireframeGenerator: React.FC<WireframeGeneratorProps> = ({ initialDescription = '', onBackToLanding }) => {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [showChat, setShowChat] = useState(false);
+    const [messages, setMessages] = useState<ChatMessage[]>([
+        {
+            role: 'assistant',
+            content: "Hi! I'm your AI wireframe assistant. Tell me about the interface you'd like to create, and I'll ask a few questions to make sure I build exactly what you need.",
+            timestamp: new Date(),
+            isQuestion: false
+        }
+    ]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [wireframeResponse, setWireframeResponse] = useState<WireframeResponse | null>(null);
     const [tabValue, setTabValue] = useState(0);
     const [questionCount, setQuestionCount] = useState(0);
-    const maxQuestions = 3;
     const [hasStarted, setHasStarted] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -47,20 +51,16 @@ const WireframeGenerator: React.FC<WireframeGeneratorProps> = ({ initialDescript
                 content: initialDescription,
                 timestamp: new Date()
             };
-            setMessages([initialMessage]);
+            setMessages(prev => [...prev, initialMessage]);
             
-            // Start morphing animation first
-            setShowChat(true);
-            
-            // Wait a bit before sending the initial message to allow animation to complete
+            // Send the initial message after a short delay
             const timeoutId = setTimeout(() => {
                 handleSendMessage(initialDescription);
-            }, 800);
+            }, 1000);
             
-            // Cleanup timeout if component unmounts
             return () => clearTimeout(timeoutId);
         }
-    }, [initialDescription]);
+    }, [initialDescription]); // Only run when initialDescription changes
 
     useEffect(() => {
         scrollToBottom();
@@ -84,22 +84,19 @@ const WireframeGenerator: React.FC<WireframeGeneratorProps> = ({ initialDescript
             timestamp: new Date()
         };
 
-        // First update messages with the user's message
-        const updatedMessages = [...messages, userMessage];
-        setMessages(updatedMessages);
+        setMessages(prev => [...prev, userMessage]);
         if (!customInput) setInputValue(''); // Only clear input if not using custom input
         setIsLoading(true);
 
         try {
-            // Convert messages to the format expected by the API, including the new user message
-            const apiMessages = updatedMessages.map(msg => ({
+            // Convert messages to the format expected by the API
+            const apiMessages = messages.map(msg => ({
                 role: msg.role,
                 content: msg.content
             }));
 
             // Get intelligent AI response
             const conversationResponse = await handleConversation(apiMessages, messageText);
-            console.log('API Response:', conversationResponse); // Debug log
             
             const aiResponse: ChatMessage = {
                 role: 'assistant',
@@ -114,8 +111,8 @@ const WireframeGenerator: React.FC<WireframeGeneratorProps> = ({ initialDescript
                 setQuestionCount(prev => prev + 1);
             }
 
-            // If AI thinks we should generate or we hit max questions, generate the wireframe
-            if (conversationResponse.should_generate || questionCount >= maxQuestions - 1) {
+            // If AI thinks we should generate and we haven't already started generating
+            if (conversationResponse.should_generate && !isLoading && !wireframeResponse) {
                 setTimeout(() => {
                     generateWireframeFromChat();
                 }, 1500);
@@ -180,27 +177,28 @@ Based on this detailed conversation, create a professional wireframe that addres
         }
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault(); // Always prevent default for Enter without shift
-            if (!isLoading && inputValue.trim()) {
-                handleSendMessage();
-            }
+            e.preventDefault();
+            handleSendMessage();
         }
     };
 
     const resetConversation = () => {
-        // Clear all state
+        setMessages([
+            {
+                role: 'assistant',
+                content: "Hi! I'm your AI wireframe assistant. Tell me about the interface you'd like to create, and I'll ask a few questions to make sure I build exactly what you need.",
+                timestamp: new Date(),
+                isQuestion: false
+            }
+        ]);
         setWireframeResponse(null);
         setQuestionCount(0);
         setInputValue('');
-        setIsLoading(false);
-        setHasStarted(false);
-        // Reset messages with initial message
-        setMessages([]);
     };
 
-    const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
     };
 
@@ -211,19 +209,13 @@ Based on this detailed conversation, create a professional wireframe that addres
     // Replit-style split-screen layout
     return (
         <Box sx={{ height: '100vh', display: 'flex', overflow: 'hidden' }}>
-            {/* Left Panel - Chat Interface with Slide animation */}
+            {/* Left Panel - Chat Interface */}
             <Box sx={{
                 width: '420px',
-                borderRight: '1px solid rgba(99, 102, 241, 0.1)',
+                borderRight: '1px solid #e0e0e0',
                 display: 'flex',
                 flexDirection: 'column',
-                backgroundColor: '#f8fafc',
-                position: 'relative',
-                zIndex: 2,
-                transform: `translateX(${showChat ? '0' : '-100%'})`,
-                opacity: showChat ? 1 : 0,
-                transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '1px 0 20px rgba(0, 0, 0, 0.05)'
+                backgroundColor: '#f8fafc'
             }}>
                 {/* Chat Header */}
                 <Box sx={{
@@ -237,7 +229,7 @@ Based on this detailed conversation, create a professional wireframe that addres
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <SmartToyIcon sx={{ mr: 1, color: '#6366f1' }} />
                         <Typography variant="h6" fontWeight="bold" sx={{ color: '#374151' }}>
-                            WireMind
+                            Wireframe Assistant
                         </Typography>
                     </Box>
                     <IconButton onClick={resetConversation} size="small" title="Reset conversation">
@@ -278,19 +270,9 @@ Based on this detailed conversation, create a professional wireframe that addres
                                 color: message.role === 'user' ? 'white' : '#374151',
                                 borderRadius: 2,
                                 p: 1.5,
-                                boxShadow: message.role === 'user' 
-                                    ? '0 4px 12px rgba(99, 102, 241, 0.2)'
-                                    : '0 4px 12px rgba(0, 0, 0, 0.05)',
-                                transition: 'all 0.2s ease-in-out',
-                                '&:hover': {
-                                    transform: 'translateY(-1px)',
-                                    boxShadow: message.role === 'user'
-                                        ? '0 6px 16px rgba(99, 102, 241, 0.25)'
-                                        : '0 6px 16px rgba(0, 0, 0, 0.08)'
-                                },
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                                 ...(message.role === 'assistant' && {
-                                    border: '1px solid rgba(229, 231, 235, 0.5)',
-                                    backdropFilter: 'blur(8px)'
+                                    border: '1px solid #e5e7eb'
                                 })
                             }}>
                                 <Typography variant="body2" sx={{ 
@@ -349,22 +331,7 @@ Based on this detailed conversation, create a professional wireframe that addres
                     borderTop: '1px solid #e0e0e0',
                     backgroundColor: 'white'
                 }}>
-                    <Box sx={{ 
-                        display: 'flex', 
-                        gap: 1, 
-                        alignItems: 'flex-end',
-                        position: 'relative',
-                        '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: -20,
-                            left: 0,
-                            right: 0,
-                            height: 20,
-                            background: 'linear-gradient(to top, rgba(255,255,255,1), rgba(255,255,255,0))',
-                            pointerEvents: 'none'
-                        }
-                    }}>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
                         <TextField
                             ref={inputRef}
                             fullWidth
@@ -379,32 +346,12 @@ Based on this detailed conversation, create a professional wireframe that addres
                             sx={{
                                 '& .MuiOutlinedInput-root': {
                                     borderRadius: 2,
-                                    fontSize: '0.9rem',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                                    backdropFilter: 'blur(8px)',
-                                    transition: 'all 0.2s ease-in-out',
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                        '& fieldset': {
-                                            borderColor: 'rgba(99, 102, 241, 0.4) !important'
-                                        }
-                                    },
-                                    '&.Mui-focused': {
-                                        backgroundColor: '#ffffff',
-                                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.1)',
-                                        '& fieldset': {
-                                            borderColor: '#6366f1 !important',
-                                            borderWidth: '2px !important'
-                                        }
-                                    }
+                                    fontSize: '0.9rem'
                                 }
                             }}
                         />
                         <IconButton 
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleSendMessage();
-                            }}
+                            onClick={handleSendMessage}
                             disabled={!inputValue.trim() || isLoading}
                             sx={{
                                 bgcolor: '#6366f1',
@@ -425,13 +372,7 @@ Based on this detailed conversation, create a professional wireframe that addres
             </Box>
 
             {/* Right Panel - Wireframe Display */}
-            <Box sx={{ 
-                flexGrow: 1, 
-                display: 'flex', 
-                flexDirection: 'column',
-                overflow: 'hidden',
-                transition: 'all 0.5s ease-out'
-            }}>
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                 {wireframeResponse ? (
                     <>
                         {/* Header with tabs */}
@@ -440,37 +381,15 @@ Based on this detailed conversation, create a professional wireframe that addres
                                 value={tabValue} 
                                 onChange={handleTabChange}
                                 sx={{
-                                    '& .MuiTabs-indicator': {
-                                        backgroundColor: '#6366f1',
-                                        height: 3,
-                                        borderRadius: '3px 3px 0 0'
-                                    },
                                     '& .MuiTab-root': {
                                         minHeight: '60px',
                                         textTransform: 'none',
-                                        fontWeight: 500,
-                                        color: '#6b7280',
-                                        transition: 'all 0.2s ease-in-out',
-                                        '&:hover': {
-                                            color: '#6366f1',
-                                            backgroundColor: 'rgba(99, 102, 241, 0.04)'
-                                        },
-                                        '&.Mui-selected': {
-                                            color: '#6366f1',
-                                            fontWeight: 600
-                                        },
-                                        '& .MuiSvgIcon-root': {
-                                            transition: 'transform 0.2s ease-in-out'
-                                        },
-                                        '&:hover .MuiSvgIcon-root': {
-                                            transform: 'scale(1.1)'
-                                        }
+                                        fontWeight: 500
                                     }
                                 }}
                             >
                                 <Tab icon={<PreviewIcon />} label="Wireframe Preview" iconPosition="start" />
                                 <Tab icon={<CodeIcon />} label="SVG Code" iconPosition="start" />
-                                <Tab icon={<AccountTreeIcon />} label="Workflow" iconPosition="start" />
                             </Tabs>
                         </Box>
 
@@ -485,8 +404,6 @@ Based on this detailed conversation, create a professional wireframe that addres
                                     background: 'white',
                                     borderRadius: 2,
                                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                                    opacity: wireframeResponse ? 1 : 0.5,
-                                    transition: 'opacity 0.3s ease-out',
                                     p: 3
                                 }}>
                                     <SvgRenderer svgCode={wireframeResponse.svg_code} />
@@ -503,94 +420,6 @@ Based on this detailed conversation, create a professional wireframe that addres
                                     <CodeDisplay code={wireframeResponse.svg_code} language="xml" />
                                 </Box>
                             )}
-                            {tabValue === 2 && (
-                                <Box sx={{ 
-                                    background: 'white',
-                                    borderRadius: 2,
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                                    p: 3,
-                                    overflow: 'auto'
-                                }}>
-                                    <Typography variant="h6" gutterBottom sx={{ mb: 4 }}>Wireframe Generation Workflow</Typography>
-                                    <Box sx={{ 
-                                        width: '100%',
-                                        minHeight: 600,
-                                        position: 'relative',
-                                        '& svg': {
-                                            maxWidth: '100%',
-                                            height: 'auto'
-                                        }
-                                    }}>
-                                        <svg width="100%" height="100%" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg">
-                                            <defs>
-                                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                                                    <polygon points="0 0, 10 3.5, 0 7" fill="#6366f1" />
-                                                </marker>
-                                            </defs>
-
-                                            {/* Project Analysis Node */}
-                                            <rect x="50" y="50" width="200" height="100" rx="10" fill="#fff" stroke="#6366f1" strokeWidth="2"/>
-                                            <text x="150" y="85" textAnchor="middle" fill="#374151" fontWeight="bold">1. Project Analysis</text>
-                                            <text x="150" y="105" textAnchor="middle" fill="#6b7280" fontSize="12">Requirements Gathering</text>
-                                            <text x="150" y="125" textAnchor="middle" fill="#6b7280" fontSize="12">User Needs Analysis</text>
-
-                                            {/* UX Design Node */}
-                                            <rect x="400" y="50" width="200" height="100" rx="10" fill="#fff" stroke="#6366f1" strokeWidth="2"/>
-                                            <text x="500" y="85" textAnchor="middle" fill="#374151" fontWeight="bold">2. UX Design</text>
-                                            <text x="500" y="105" textAnchor="middle" fill="#6b7280" fontSize="12">Information Architecture</text>
-                                            <text x="500" y="125" textAnchor="middle" fill="#6b7280" fontSize="12">User Flow Mapping</text>
-
-                                            {/* Content Structure Node */}
-                                            <rect x="50" y="250" width="200" height="100" rx="10" fill="#fff" stroke="#6366f1" strokeWidth="2"/>
-                                            <text x="150" y="285" textAnchor="middle" fill="#374151" fontWeight="bold">3. Content Structure</text>
-                                            <text x="150" y="305" textAnchor="middle" fill="#6b7280" fontSize="12">Content Hierarchy</text>
-                                            <text x="150" y="325" textAnchor="middle" fill="#6b7280" fontSize="12">Component Layout</text>
-
-                                            {/* Visual Design Node */}
-                                            <rect x="400" y="250" width="200" height="100" rx="10" fill="#fff" stroke="#6366f1" strokeWidth="2"/>
-                                            <text x="500" y="285" textAnchor="middle" fill="#374151" fontWeight="bold">4. Visual Design</text>
-                                            <text x="500" y="305" textAnchor="middle" fill="#6b7280" fontSize="12">Style Guidelines</text>
-                                            <text x="500" y="325" textAnchor="middle" fill="#6b7280" fontSize="12">Component Design</text>
-
-                                            {/* Final Wireframe Node */}
-                                            <rect x="225" y="450" width="200" height="100" rx="10" fill="#10b981" stroke="#059669" strokeWidth="2"/>
-                                            <text x="325" y="485" textAnchor="middle" fill="#fff" fontWeight="bold">5. Final Wireframe</text>
-                                            <text x="325" y="505" textAnchor="middle" fill="#fff" fontSize="12">Interactive Preview</text>
-                                            <text x="325" y="525" textAnchor="middle" fill="#fff" fontSize="12">Export Options</text>
-
-                                            {/* Connecting Arrows */}
-                                            <path d="M250 100 L400 100" stroke="#6366f1" strokeWidth="2" markerEnd="url(#arrowhead)" />
-                                            <path d="M500 150 L500 250" stroke="#6366f1" strokeWidth="2" markerEnd="url(#arrowhead)" />
-                                            <path d="M400 300 L250 300" stroke="#6366f1" strokeWidth="2" markerEnd="url(#arrowhead)" />
-                                            <path d="M150 350 L325 450" stroke="#6366f1" strokeWidth="2" markerEnd="url(#arrowhead)" />
-                                            <path d="M500 350 L325 450" stroke="#6366f1" strokeWidth="2" markerEnd="url(#arrowhead)" />
-                                        </svg>
-                                    </Box>
-                                    {/* Key Steps Summary */}
-                                    <Box sx={{ mt: 4, px: 2 }}>
-                                        <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="primary">
-                                            Generation Process Overview
-                                        </Typography>
-                                        <Box component="ul" sx={{ pl: 2 }}>
-                                            <Box component="li" sx={{ mb: 1 }}>
-                                                <strong>Project Analysis:</strong> Understanding your requirements and target audience.
-                                            </Box>
-                                            <Box component="li" sx={{ mb: 1 }}>
-                                                <strong>UX Design:</strong> Mapping user flows and information architecture.
-                                            </Box>
-                                            <Box component="li" sx={{ mb: 1 }}>
-                                                <strong>Content Structure:</strong> Organizing content hierarchy and component layouts.
-                                            </Box>
-                                            <Box component="li" sx={{ mb: 1 }}>
-                                                <strong>Visual Design:</strong> Applying style guidelines and component design patterns.
-                                            </Box>
-                                            <Box component="li" sx={{ mb: 1 }}>
-                                                <strong>Final Wireframe:</strong> Interactive preview with editing capabilities.
-                                            </Box>
-                                        </Box>
-                                    </Box>
-                                </Box>
-                            )}
                         </Box>
                     </>
                 ) : (
@@ -603,24 +432,7 @@ Based on this detailed conversation, create a professional wireframe that addres
                         flexGrow: 1,
                         textAlign: 'center',
                         p: 4,
-                        background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            width: '200%',
-                            height: '200%',
-                            top: '-50%',
-                            left: '-50%',
-                            background: 'radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0) 70%)',
-                            animation: 'pulse 15s ease-in-out infinite'
-                        },
-                        '@keyframes pulse': {
-                            '0%': { transform: 'scale(1)' },
-                            '50%': { transform: 'scale(1.2)' },
-                            '100%': { transform: 'scale(1)' }
-                        }
+                        backgroundColor: '#fafafa'
                     }}>
                         <AutoAwesomeIcon sx={{ fontSize: 80, color: '#6366f1', mb: 3, opacity: 0.7 }} />
                         <Typography variant="h4" fontWeight="bold" sx={{ mb: 2, color: '#374151' }}>
@@ -644,19 +456,9 @@ Based on this detailed conversation, create a professional wireframe that addres
                                     variant="outlined"
                                     sx={{ 
                                         cursor: 'pointer',
-                                        borderColor: 'rgba(99, 102, 241, 0.3)',
-                                        background: 'rgba(255, 255, 255, 0.8)',
-                                        backdropFilter: 'blur(8px)',
-                                        transition: 'all 0.2s ease-in-out',
                                         '&:hover': { 
-                                            backgroundColor: '#ffffff',
-                                            borderColor: '#6366f1',
-                                            transform: 'translateY(-1px)',
-                                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.15)'
-                                        },
-                                        '&:active': {
-                                            transform: 'translateY(0)',
-                                            boxShadow: '0 2px 8px rgba(99, 102, 241, 0.1)'
+                                            backgroundColor: '#f3f4f6',
+                                            borderColor: '#6366f1'
                                         }
                                     }}
                                 />
